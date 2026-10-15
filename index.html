@@ -1,0 +1,886 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bắn Máy Bay</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23da251d'/%3E%3Cpolygon points='16,6 18.4,13.2 26,13.2 19.8,17.7 22.2,24.9 16,20.4 9.8,24.9 12.2,17.7 6,13.2 13.6,13.2' fill='%23ffff00'/%3E%3C/svg%3E">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; }
+body {
+  background:#0a0a1a;
+  color:#fff;
+  font-family: Tahoma, Arial, sans-serif;
+  text-align:center;
+  -webkit-user-select:none;
+  -moz-user-select:none;
+  user-select:none;
+}
+#wrap { padding:10px 0; }
+h1 {
+  font-size:22px;
+  color:#ffd21e;
+  text-shadow:1px 1px 0 #000;
+  margin-bottom:6px;
+}
+#stage {
+  position:relative;
+  display:inline-block;
+  border:3px solid #da251d;
+  border-radius:6px;
+  background:#05060f;
+  box-shadow:0 0 18px rgba(218,37,29,0.5);
+}
+canvas { display:block; background:#05060f; width:100%; height:100%; }
+#hud {
+  position:absolute; top:0; left:0; right:0;
+  padding:6px 10px;
+  font-size:14px;
+  color:#fff;
+  text-shadow:1px 1px 0 #000;
+  pointer-events:none;
+  text-align:left;
+}
+#hud span { margin-right:16px; }
+.overlay {
+  position:absolute; top:0; left:0; right:0; bottom:0;
+  background:rgba(5,6,15,0.88);
+  display:none;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
+.overlay.show { display:-webkit-box; display:-webkit-flex; display:flex; }
+.overlay h2 { color:#ffd21e; font-size:30px; margin-bottom:10px; text-shadow:2px 2px 0 #000; }
+.overlay p { font-size:14px; margin:4px 0; color:#ddd; }
+.btn {
+  margin-top:16px;
+  padding:10px 26px;
+  font-size:16px;
+  font-family:inherit;
+  color:#fff;
+  background:#da251d;
+  border:2px solid #ffd21e;
+  border-radius:6px;
+  cursor:pointer;
+}
+.btn:hover { background:#b31d16; }
+#tips { margin-top:10px; font-size:12px; color:#9aa; line-height:1.6; }
+/* khi toan man hinh: can giua noi dung */
+#wrap:-webkit-full-screen { width:100%; height:100%; display:-webkit-flex; -webkit-flex-direction:column; -webkit-align-items:center; -webkit-justify-content:center; }
+#wrap:-moz-full-screen { width:100%; height:100%; }
+#wrap:fullscreen { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1>Bắn Máy Bay</h1>
+  <div style="margin-bottom:8px;">
+    <button class="btn" id="btnFull" style="margin-top:0;padding:6px 16px;font-size:13px;">Toàn màn hình</button>
+  </div>
+  <div id="stage">
+    <canvas id="game" width="480" height="600"></canvas>
+    <div id="hud">
+      <span>Điểm: <b id="score">0</b></span>
+      <span>Mạng: <b id="lives">3</b></span>
+      <span>Màn: <b id="level">1</b></span>
+      <span id="buffs" style="color:#ffd21e;"></span>
+    </div>
+    <div id="bossbarWrap" style="position:absolute;left:40px;right:40px;top:34px;display:none;pointer-events:none;">
+      <div style="font-size:12px;color:#ff8080;text-shadow:1px 1px 0 #000;text-align:center;margin-bottom:2px;">TRÙM CUỐI</div>
+      <div style="height:8px;background:#3a0d0d;border:1px solid #ff5a5a;border-radius:4px;overflow:hidden;">
+        <div id="bossbar" style="height:100%;width:100%;background:#ff3b3b;"></div>
+      </div>
+    </div>
+    <div class="overlay show" id="startScreen">
+      <h2>Bắn Máy Bay</h2>
+      <p>Điều khiển phi thuyền, bắn hạ máy bay địch!</p>
+      <p>Phím mũi tên / A - D : di chuyển &nbsp;|&nbsp; SPACE : bắn</p>
+      <p>Hoặc di chuyển bằng CHUỘT, bấm chuột để bắn &nbsp;|&nbsp; M : âm thanh</p>
+      <p style="color:#9fe6a0;">Nhặt vật phẩm rơi ra: <b style="color:#5ad1ff;">3 TIA</b>, <b style="color:#ffd21e;">BẮN NHANH</b>, <b style="color:#7cff6b;">KHIÊN</b></p>
+      <p style="color:#ff9a9a;">Cứ 3 màn sẽ có một TRÙM CUỐI xuất hiện!</p>
+      <div id="lbStart" style="margin-top:10px;font-size:13px;color:#ddd;"></div>
+      <button class="btn" id="btnStart">BẮT ĐẦU</button>
+    </div>
+    <div class="overlay" id="overScreen">
+      <h2 id="overTitle">KẾT THÚC</h2>
+      <p>Điểm của bạn: <b id="finalScore">0</b></p>
+      <p>Điểm cao nhất: <b id="bestScore">0</b></p>
+      <div id="lbOver" style="margin-top:8px;font-size:13px;color:#ddd;"></div>
+      <button class="btn" id="btnRestart">CHƠI LẠI</button>
+    </div>
+  </div>
+  <div id="tips">Game chạy bằng HTML + Canvas, tương thích trình duyệt trên Windows 7.<br>Made in Vietnam</div>
+</div>
+<script>
+(function(){
+  var canvas = document.getElementById('game');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+
+  // requestAnimationFrame fallback cho trinh duyet cu
+  var raf = window.requestAnimationFrame ||
+            window.webkitRequestAnimationFrame ||
+            window.mozRequestAnimationFrame ||
+            function(cb){ return window.setTimeout(cb, 1000/60); };
+
+  var elScore = document.getElementById('score');
+  var elLives = document.getElementById('lives');
+  var elLevel = document.getElementById('level');
+  var startScreen = document.getElementById('startScreen');
+  var overScreen = document.getElementById('overScreen');
+  var finalScore = document.getElementById('finalScore');
+  var bestScore = document.getElementById('bestScore');
+  var overTitle = document.getElementById('overTitle');
+  var elBuffs = document.getElementById('buffs');
+  var bossbarWrap = document.getElementById('bossbarWrap');
+  var bossbar = document.getElementById('bossbar');
+  var lbStart = document.getElementById('lbStart');
+  var lbOver = document.getElementById('lbOver');
+
+  var state = 'menu'; // menu, play, over
+  var score = 0, lives = 3, level = 1, best = 0;
+
+  // doc diem cao nhat (neu trinh duyet ho tro localStorage)
+  try { best = parseInt(window.localStorage.getItem('pdvn_best') || '0', 10) || 0; }
+  catch(e){ best = 0; }
+
+  var player, bullets, enemies, eBullets, stars, particles;
+  var powerups, boss, meteors;
+  var shake = 0;
+  var bossEvery = 3;        // cu 3 man co 1 boss
+  var lastBossLevel = 0;    // man gan nhat da sinh boss
+  var keys = {};
+  var mouseX = null, mouseFire = false;
+  var shootCooldown = 0;
+  var spawnTimer = 0, spawnGap = 70;
+  var levelTimer = 0;
+
+  function rand(a,b){ return a + Math.random()*(b-a); }
+
+  // ===== AM THANH (Web Audio API, tao bang code, khong can file ngoai) =====
+  var AC = window.AudioContext || window.webkitAudioContext || null;
+  var actx = null, soundOn = true;
+  function initAudio(){
+    if (!AC) { soundOn = false; return; }
+    if (!actx){
+      try { actx = new AC(); } catch(e){ soundOn = false; return; }
+    }
+    if (actx.resume) { try { actx.resume(); } catch(e){} }
+  }
+  function tone(freq, dur, type, vol, slideTo){
+    if (!soundOn || !actx) return;
+    try {
+      var t = actx.currentTime;
+      var osc = actx.createOscillator();
+      var g = actx.createGain();
+      osc.type = type || 'square';
+      osc.frequency.setValueAtTime(freq, t);
+      if (slideTo){ osc.frequency.linearRampToValueAtTime(slideTo, t + dur); }
+      g.gain.setValueAtTime(vol || 0.15, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(g); g.connect(actx.destination);
+      osc.start(t);
+      osc.stop(t + dur);
+    } catch(e){}
+  }
+  function noise(dur, vol){
+    if (!soundOn || !actx) return;
+    try {
+      var t = actx.currentTime;
+      var n = Math.floor(actx.sampleRate * dur);
+      var buf = actx.createBuffer(1, n, actx.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i=0;i<n;i++){ d[i] = (Math.random()*2-1) * (1 - i/n); }
+      var src = actx.createBufferSource(); src.buffer = buf;
+      var g = actx.createGain();
+      g.gain.setValueAtTime(vol || 0.25, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(g); g.connect(actx.destination);
+      src.start(t); src.stop(t + dur);
+    } catch(e){}
+  }
+  function sndShoot(){ tone(720, 0.08, 'square', 0.08, 420); }
+  function sndKill(){ noise(0.18, 0.3); tone(180, 0.18, 'sawtooth', 0.12, 60); }
+  function sndBigKill(){ noise(0.3, 0.4); tone(120, 0.3, 'sawtooth', 0.16, 40); }
+  function sndHurt(){ tone(300, 0.3, 'triangle', 0.25, 90); noise(0.2, 0.2); }
+  function sndOver(){ tone(400, 0.6, 'sawtooth', 0.2, 70); }
+  function sndStart(){ tone(520, 0.1, 'square', 0.12); setTimeout(function(){ tone(780, 0.14, 'square', 0.12); }, 110); }
+  function sndPower(){ tone(660, 0.1, 'square', 0.1); setTimeout(function(){ tone(990, 0.12, 'square', 0.1); }, 90); }
+  function sndBoss(){ tone(90, 0.5, 'sawtooth', 0.2, 60); noise(0.4, 0.2); }
+  function sndBossDown(){ noise(0.7, 0.5); tone(100, 0.7, 'sawtooth', 0.22, 30); }
+
+  // ===== NHAC NEN (lap bang code) =====
+  var musicTimer = null, musicStep = 0;
+  var melody = [392,523,587,659,523,440,494,587];   // giai dieu don gian
+  function musicTick(){
+    if (soundOn && actx && state === 'play'){
+      var f = melody[musicStep % melody.length];
+      tone(f, 0.26, 'triangle', 0.045);
+      if (musicStep % 2 === 0) tone(f/2, 0.42, 'sine', 0.05);
+    }
+    musicStep++;
+    musicTimer = window.setTimeout(musicTick, 300);
+  }
+  function startMusic(){ if (!musicTimer) musicTick(); }
+
+  // ===== BANG XEP HANG (luu nhieu lan choi) =====
+  function loadScores(){
+    try {
+      var raw = window.localStorage.getItem('pdvn_scores');
+      var arr = raw ? JSON.parse(raw) : [];
+      if (!(arr instanceof Array)) arr = [];
+      return arr;
+    } catch(e){ return []; }
+  }
+  function saveScore(sc){
+    var arr = loadScores();
+    arr.push({ s:sc, d:(new Date()).toLocaleDateString() });
+    arr.sort(function(a,b){ return b.s - a.s; });
+    arr = arr.slice(0, 5);
+    try { window.localStorage.setItem('pdvn_scores', JSON.stringify(arr)); } catch(e){}
+    return arr;
+  }
+  function renderBoard(el, highlight){
+    var arr = loadScores();
+    if (!arr.length){ el.innerHTML = '<i>Chua co diem nao</i>'; return; }
+    var html = '<div style="color:#ffd21e;margin-bottom:4px;">BANG XEP HANG</div>';
+    var medals = ['1.','2.','3.','4.','5.'];
+    for (var i=0;i<arr.length;i++){
+      var hl = (highlight!=null && arr[i].s===highlight) ? 'color:#7cff6b;font-weight:bold;' : '';
+      html += '<div style="'+hl+'">'+medals[i]+' '+arr[i].s+' <span style="color:#889;font-size:11px;">('+arr[i].d+')</span></div>';
+    }
+    el.innerHTML = html;
+  }
+
+  function initStars(){
+    stars = [];
+    for (var i=0;i<60;i++){
+      stars.push({ x:Math.random()*W, y:Math.random()*H, s:rand(0.5,2), v:rand(0.4,1.8) });
+    }
+  }
+
+  function resetGame(){
+    score = 0; lives = 3; level = 1;
+    player = { x:W/2, y:H-60, w:34, h:34, speed:5, cool:0, inv:0,
+               tripleT:0, rapidT:0, shieldT:0 };
+    bullets = []; enemies = []; eBullets = []; particles = [];
+    powerups = []; meteors = []; boss = null;
+    lastBossLevel = 0; shake = 0;
+    spawnTimer = 0; spawnGap = 70; levelTimer = 0; shootCooldown = 0;
+    bossbarWrap.style.display = 'none';
+    initStars();
+    updateHud();
+  }
+
+  function updateHud(){
+    elScore.innerHTML = score;
+    elLives.innerHTML = lives;
+    elLevel.innerHTML = level;
+    var b = [];
+    if (player){
+      if (player.tripleT > 0) b.push('3 TIA');
+      if (player.rapidT > 0) b.push('BAN NHANH');
+      if (player.shieldT > 0) b.push('KHIEN');
+    }
+    elBuffs.innerHTML = b.length ? ('[' + b.join(' + ') + ']') : '';
+  }
+
+  function spawnEnemy(){
+    var type = Math.random() < 0.18 + level*0.02 ? 'big' : 'small';
+    if (type === 'big'){
+      enemies.push({ x:rand(40,W-40), y:-40, w:40, h:34, hp:3, v:rand(0.8,1.4)+level*0.1,
+                     fire:rand(60,120), type:'big', sway:rand(0,6.28), amp:rand(0.3,1) });
+    } else {
+      enemies.push({ x:rand(25,W-25), y:-30, w:28, h:24, hp:1, v:rand(1.6,2.6)+level*0.15,
+                     fire:rand(90,180), type:'small', sway:rand(0,6.28), amp:rand(0.2,0.8) });
+    }
+  }
+
+  function boom(x,y,color,n){
+    for (var i=0;i<n;i++){
+      var a = Math.random()*6.28, sp = rand(1,4);
+      particles.push({ x:x, y:y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:rand(18,34), color:color });
+    }
+  }
+
+  // sinh vat pham nang cap
+  function dropPower(x,y,force){
+    if (!force && Math.random() > 0.14) return;
+    var r = Math.random();
+    var type = r < 0.4 ? 'triple' : (r < 0.75 ? 'rapid' : 'shield');
+    powerups.push({ x:x, y:y, w:20, h:20, v:1.6, type:type, sway:rand(0,6.28) });
+  }
+
+  // sinh trum cuoi
+  function spawnBoss(){
+    var hp = 60 + level * 25;
+    boss = { x:W/2, y:-70, w:120, h:64, hp:hp, maxhp:hp, v:1.6, dir:1,
+             fire:90, enter:true, flash:0 };
+    bossbarWrap.style.display = 'block';
+    sndBoss();
+  }
+
+  // sinh sao bang (hieu ung nen)
+  function spawnMeteor(){
+    var fromLeft = Math.random() < 0.5;
+    meteors.push({ x: fromLeft ? -20 : W+20, y: rand(0, H*0.5),
+                   vx: fromLeft ? rand(5,8) : -rand(5,8), vy: rand(3,5), life: 60 });
+  }
+
+  // ===== DIEU KHIEN =====
+  document.addEventListener('keydown', function(e){
+    keys[e.keyCode] = true;
+    // phim M: bat/tat am thanh
+    if (e.keyCode===77){ soundOn = !soundOn; if (soundOn) initAudio(); }
+    // khi bam phim di chuyen -> tat che do chuot de khong bi keo nguoc
+    if (e.keyCode===37||e.keyCode===39||e.keyCode===38||e.keyCode===40||
+        e.keyCode===65||e.keyCode===68||e.keyCode===87||e.keyCode===83){
+      mouseX = null;
+    }
+    // chong cuon trang khi bam mui ten / space
+    if (e.keyCode===32 || (e.keyCode>=37 && e.keyCode<=40)) {
+      if (e.preventDefault) e.preventDefault();
+    }
+  });
+  document.addEventListener('keyup', function(e){ keys[e.keyCode] = false; });
+
+  canvas.addEventListener('mousemove', function(e){
+    var r = canvas.getBoundingClientRect();
+    var scaleX = r.width ? (W / r.width) : 1;
+    mouseX = (e.clientX - r.left) * scaleX;
+  });
+  canvas.addEventListener('mousedown', function(e){ mouseFire = true; if(e.preventDefault)e.preventDefault(); });
+  document.addEventListener('mouseup', function(){ mouseFire = false; });
+  canvas.addEventListener('mouseleave', function(){ mouseX = null; });
+
+  function firePlayer(){
+    if (player.tripleT > 0){
+      bullets.push({ x:player.x,   y:player.y-16, w:3, h:12, v:9, vx:0 });
+      bullets.push({ x:player.x-9, y:player.y-14, w:3, h:12, v:9, vx:-2.4 });
+      bullets.push({ x:player.x+9, y:player.y-14, w:3, h:12, v:9, vx:2.4 });
+    } else {
+      bullets.push({ x:player.x-8, y:player.y-16, w:3, h:12, v:9, vx:0 });
+      bullets.push({ x:player.x+5, y:player.y-16, w:3, h:12, v:9, vx:0 });
+    }
+    sndShoot();
+  }
+
+  function hit(a,b){
+    return Math.abs(a.x-b.x) < (a.w+b.w)/2 && Math.abs(a.y-b.y) < (a.h+b.h)/2;
+  }
+
+  // ===== CAP NHAT =====
+  function update(){
+    // sao nen
+    for (var i=0;i<stars.length;i++){
+      var st = stars[i];
+      st.y += st.v;
+      if (st.y > H){ st.y = 0; st.x = Math.random()*W; }
+    }
+    if (state !== 'play') return;
+
+    // di chuyen nguoi choi: ban phim (uu tien ban phim)
+    var usingKeys = keys[37]||keys[39]||keys[38]||keys[40]||keys[65]||keys[68]||keys[87]||keys[83];
+    if (keys[37] || keys[65]) player.x -= player.speed;
+    if (keys[39] || keys[68]) player.x += player.speed;
+    if (keys[38] || keys[87]) player.y -= player.speed;
+    if (keys[40] || keys[83]) player.y += player.speed;
+    // di chuyen bang chuot - chi khi dang KHONG dung ban phim
+    if (mouseX !== null && !usingKeys){
+      var dx = mouseX - player.x;
+      if (Math.abs(dx) > 2) player.x += dx * 0.25;
+    }
+    if (player.x < 18) player.x = 18;
+    if (player.x > W-18) player.x = W-18;
+    if (player.y < H/2) player.y = H/2;
+    if (player.y > H-24) player.y = H-24;
+
+    // ban (ban nhanh neu co buff rapid)
+    if (player.cool > 0) player.cool--;
+    var coolBase = player.rapidT > 0 ? 4 : 9;
+    if ((keys[32] || mouseFire) && player.cool <= 0){
+      firePlayer();
+      player.cool = coolBase;
+    }
+    if (player.inv > 0) player.inv--;
+
+    // dem nguoc thoi gian cac vat pham
+    if (player.tripleT > 0){ player.tripleT--; if (player.tripleT===0) updateHud(); }
+    if (player.rapidT  > 0){ player.rapidT--;  if (player.rapidT ===0) updateHud(); }
+    if (player.shieldT > 0){ player.shieldT--; if (player.shieldT===0) updateHud(); }
+
+    // giam rung man hinh
+    if (shake > 0){ shake -= 0.8; if (shake < 0) shake = 0; }
+
+    // dan nguoi choi
+    for (var i=bullets.length-1;i>=0;i--){
+      var b = bullets[i];
+      b.y -= b.v;
+      if (b.vx) b.x += b.vx;
+      if (b.y < -20 || b.x < -20 || b.x > W+20){ bullets.splice(i,1); }
+    }
+
+    // sao bang (nen)
+    if (Math.random() < 0.012) spawnMeteor();
+    for (var i=meteors.length-1;i>=0;i--){
+      var mt = meteors[i];
+      mt.x += mt.vx; mt.y += mt.vy; mt.life--;
+      if (mt.life <= 0 || mt.y > H+20){ meteors.splice(i,1); }
+    }
+
+    // vat pham roi
+    for (var i=powerups.length-1;i>=0;i--){
+      var pu = powerups[i];
+      pu.y += pu.v; pu.sway += 0.08;
+      pu.x += Math.sin(pu.sway) * 0.6;
+      if (pu.y > H+20){ powerups.splice(i,1); continue; }
+      if (hit(pu, player)){
+        if (pu.type === 'triple') player.tripleT = 600;
+        else if (pu.type === 'rapid') player.rapidT = 600;
+        else player.shieldT = 480;
+        powerups.splice(i,1);
+        sndPower();
+        boom(player.x, player.y, '#7cff6b', 10);
+        updateHud();
+      }
+    }
+
+    // sinh dich (tam dung khi co trum cuoi)
+    if (!boss){
+      spawnTimer++;
+      if (spawnTimer >= spawnGap){ spawnTimer = 0; spawnEnemy(); }
+
+      // len man moi
+      levelTimer++;
+      if (levelTimer >= 900){
+        levelTimer = 0;
+        level++;
+        if (spawnGap > 28) spawnGap -= 6;
+        updateHud();
+        // cu bossEvery man thi sinh trum cuoi
+        if (level % bossEvery === 0 && lastBossLevel !== level){
+          lastBossLevel = level;
+          spawnBoss();
+        }
+      }
+    }
+
+    // cap nhat trum cuoi
+    if (boss) updateBoss();
+
+    // cap nhat dich
+    for (var i=enemies.length-1;i>=0;i--){
+      var en = enemies[i];
+      en.y += en.v;
+      en.sway += 0.05;
+      en.x += Math.sin(en.sway) * en.amp;
+      en.fire--;
+      if (en.fire <= 0 && en.y > 0 && en.y < H-80){
+        en.fire = en.type==='big' ? rand(70,130) : rand(110,200);
+        eBullets.push({ x:en.x, y:en.y+en.h/2, w:5, h:10, v:3+level*0.2 });
+      }
+      // va cham voi dan nguoi choi
+      for (var j=bullets.length-1;j>=0;j--){
+        if (hit(en, bullets[j])){
+          en.hp--;
+          boom(bullets[j].x, bullets[j].y, '#ffd21e', 4);
+          bullets.splice(j,1);
+          if (en.hp <= 0){
+            boom(en.x, en.y, en.type==='big'?'#ff6a00':'#ff3b3b', en.type==='big'?20:12);
+            if (en.type==='big') sndBigKill(); else sndKill();
+            score += en.type==='big' ? 50 : 20;
+            dropPower(en.x, en.y, en.type==='big');
+            enemies.splice(i,1);
+            updateHud();
+            break;
+          }
+        }
+      }
+      if (!en || enemies[i] !== en) continue;
+      // dich cham nguoi choi
+      if (hit(en, player) && player.inv <= 0){
+        enemies.splice(i,1);
+        boom(player.x, player.y, '#ffd21e', 18);
+        hitPlayer();
+        continue;
+      }
+      if (en.y > H+40){ enemies.splice(i,1); }
+    }
+
+    // dan dich
+    for (var i=eBullets.length-1;i>=0;i--){
+      var eb = eBullets[i];
+      eb.y += eb.v;
+      if (eb.vx) eb.x += eb.vx;
+      if (eb.y > H+20 || eb.x < -20 || eb.x > W+20){ eBullets.splice(i,1); continue; }
+      if (player.inv <= 0 && hit(eb, player)){
+        eBullets.splice(i,1);
+        boom(player.x, player.y, '#ffd21e', 16);
+        hitPlayer();
+      }
+    }
+
+    // hat no
+    for (var i=particles.length-1;i>=0;i--){
+      var p = particles[i];
+      p.x += p.vx; p.y += p.vy; p.vx *= 0.96; p.vy *= 0.96; p.life--;
+      if (p.life <= 0) particles.splice(i,1);
+    }
+  }
+
+  // ===== TRUM CUOI =====
+  function updateBoss(){
+    var bo = boss;
+    if (bo.flash > 0) bo.flash--;
+    if (bo.enter){
+      bo.y += 1.4;
+      if (bo.y >= 90){ bo.y = 90; bo.enter = false; }
+    } else {
+      bo.x += bo.v * bo.dir;
+      if (bo.x < bo.w/2 + 10){ bo.x = bo.w/2 + 10; bo.dir = 1; }
+      if (bo.x > W - bo.w/2 - 10){ bo.x = W - bo.w/2 - 10; bo.dir = -1; }
+      // ban dan theo cum
+      bo.fire--;
+      if (bo.fire <= 0){
+        bo.fire = 55;
+        // quat 5 tia
+        for (var k=-2;k<=2;k++){
+          eBullets.push({ x:bo.x, y:bo.y+bo.h/2, w:6, h:12, v:3.4, vx:k*1.3 });
+        }
+        // 2 tia nham vao nguoi choi
+        var dx = player.x - bo.x, dy = player.y - bo.y;
+        var dd = Math.sqrt(dx*dx+dy*dy) || 1;
+        eBullets.push({ x:bo.x-24, y:bo.y+bo.h/2, w:6, h:12, v:0, vx:dx/dd*4.2 });
+        eBullets[eBullets.length-1].v = dy/dd*4.2;
+        eBullets.push({ x:bo.x+24, y:bo.y+bo.h/2, w:6, h:12, v:dy/dd*4.2, vx:dx/dd*4.2 });
+      }
+    }
+    // dan nguoi choi trung trum
+    for (var j=bullets.length-1;j>=0;j--){
+      if (hit(bo, bullets[j])){
+        bo.hp--;
+        bo.flash = 3;
+        boom(bullets[j].x, bullets[j].y, '#ffd21e', 3);
+        bullets.splice(j,1);
+        if (bo.hp <= 0){ killBoss(); return; }
+      }
+    }
+    // trum cham nguoi choi
+    if (!bo.enter && hit(bo, player) && player.inv <= 0){
+      boom(player.x, player.y, '#ffd21e', 18);
+      hitPlayer();
+    }
+    bossbar.style.width = Math.max(0, (bo.hp/bo.maxhp)*100) + '%';
+  }
+
+  function killBoss(){
+    boom(boss.x, boss.y, '#ff6a00', 40);
+    boom(boss.x-30, boss.y, '#ffd21e', 20);
+    boom(boss.x+30, boss.y, '#ff3b3b', 20);
+    sndBossDown();
+    shake = 16;
+    score += 300 + level * 20;
+    // thuong 2 vat pham
+    dropPower(boss.x-20, boss.y, true);
+    dropPower(boss.x+20, boss.y, true);
+    boss = null;
+    bossbarWrap.style.display = 'none';
+    updateHud();
+  }
+
+  // nhan sat thuong (co khien thi do)
+  function hitPlayer(){
+    if (player.shieldT > 0){
+      player.inv = 30;
+      shake = 6;
+      boom(player.x, player.y, '#7cff6b', 12);
+      return;
+    }
+    damage();
+  }
+
+  function damage(){
+    lives--;
+    updateHud();
+    player.inv = 90;
+    shake = 12;
+    sndHurt();
+    if (lives <= 0){ gameOver(); }
+  }
+
+  function gameOver(){
+    state = 'over';
+    sndOver();
+    boss = null;
+    bossbarWrap.style.display = 'none';
+    if (score > best){
+      best = score;
+      try { window.localStorage.setItem('pdvn_best', String(best)); } catch(e){}
+    }
+    saveScore(score);
+    renderBoard(lbOver, score);
+    finalScore.innerHTML = score;
+    bestScore.innerHTML = best;
+    overTitle.innerHTML = 'KẾT THÚC';
+    overScreen.className = 'overlay show';
+  }
+
+  // ===== VE =====
+  function drawShip(x,y){
+    // than phi thuyen
+    ctx.fillStyle = '#2fa4ff';
+    ctx.beginPath();
+    ctx.moveTo(x, y-18);
+    ctx.lineTo(x-16, y+16);
+    ctx.lineTo(x+16, y+16);
+    ctx.closePath();
+    ctx.fill();
+    // canh
+    ctx.fillStyle = '#1b6fc0';
+    ctx.fillRect(x-18, y+6, 6, 12);
+    ctx.fillRect(x+12, y+6, 6, 12);
+    // buong lai (ngoi sao vang - yeu to Viet Nam)
+    ctx.fillStyle = '#ffd21e';
+    star(x, y, 5, 7, 3.2);
+    // lua day
+    ctx.fillStyle = '#ff7a1a';
+    ctx.beginPath();
+    ctx.moveTo(x-5, y+16);
+    ctx.lineTo(x+5, y+16);
+    ctx.lineTo(x, y+16+rand(6,14));
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function star(cx,cy,spikes,outer,inner){
+    var rot = -Math.PI/2, step = Math.PI/spikes;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(rot)*outer, cy + Math.sin(rot)*outer);
+    for (var i=0;i<spikes;i++){
+      rot += step;
+      ctx.lineTo(cx + Math.cos(rot)*inner, cy + Math.sin(rot)*inner);
+      rot += step;
+      ctx.lineTo(cx + Math.cos(rot)*outer, cy + Math.sin(rot)*outer);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawEnemy(en){
+    if (en.type === 'big'){
+      ctx.fillStyle = '#c0392b';
+      ctx.fillRect(en.x-20, en.y-14, 40, 26);
+      ctx.fillStyle = '#7a1f16';
+      ctx.fillRect(en.x-20, en.y+8, 40, 6);
+      ctx.fillStyle = '#ffcf4a';
+      ctx.beginPath(); ctx.arc(en.x, en.y-2, 6, 0, 6.28); ctx.fill();
+    } else {
+      ctx.fillStyle = '#e74c3c';
+      ctx.beginPath();
+      ctx.moveTo(en.x, en.y+12);
+      ctx.lineTo(en.x-14, en.y-10);
+      ctx.lineTo(en.x+14, en.y-10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ffd21e';
+      ctx.beginPath(); ctx.arc(en.x, en.y-2, 3.5, 0, 6.28); ctx.fill();
+    }
+  }
+
+  function drawPower(pu){
+    var col = pu.type==='triple' ? '#5ad1ff' : (pu.type==='rapid' ? '#ffd21e' : '#7cff6b');
+    var ch  = pu.type==='triple' ? '3' : (pu.type==='rapid' ? 'R' : 'S');
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(pu.x, pu.y, 11, 0, 6.28); ctx.fill();
+    ctx.fillStyle = '#05060f';
+    ctx.font = 'bold 13px Tahoma, Arial';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(ch, pu.x, pu.y+1);
+  }
+
+  function drawBoss(bo){
+    ctx.fillStyle = bo.flash > 0 ? '#ffffff' : '#8e1b14';
+    ctx.fillRect(bo.x-bo.w/2, bo.y-bo.h/2, bo.w, bo.h);
+    ctx.fillStyle = bo.flash > 0 ? '#ffd2d2' : '#5e120d';
+    ctx.fillRect(bo.x-bo.w/2, bo.y+bo.h/2-10, bo.w, 10);
+    // 2 phao hai ben
+    ctx.fillStyle = '#444';
+    ctx.fillRect(bo.x-bo.w/2-8, bo.y-6, 8, 20);
+    ctx.fillRect(bo.x+bo.w/2, bo.y-6, 8, 20);
+    // mat trung tam
+    ctx.fillStyle = '#ffcf4a';
+    ctx.beginPath(); ctx.arc(bo.x, bo.y, 14, 0, 6.28); ctx.fill();
+    ctx.fillStyle = '#da251d';
+    ctx.beginPath(); ctx.arc(bo.x, bo.y, 7, 0, 6.28); ctx.fill();
+    // ngoi sao vang
+    ctx.fillStyle = '#ffd21e';
+    star(bo.x, bo.y, 5, 5, 2.2);
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+
+    // rung man hinh
+    var ox = 0, oy = 0;
+    if (shake > 0){ ox = rand(-shake, shake); oy = rand(-shake, shake); }
+    ctx.save();
+    ctx.translate(ox, oy);
+
+    // sao nen
+    ctx.fillStyle = '#8899bb';
+    for (var i=0;i<stars.length;i++){
+      var st = stars[i];
+      ctx.globalAlpha = 0.5 + st.s*0.2;
+      ctx.fillRect(st.x, st.y, st.s, st.s);
+    }
+    ctx.globalAlpha = 1;
+
+    // sao bang (nen)
+    if (meteors){
+      for (var i=0;i<meteors.length;i++){
+        var mt = meteors[i];
+        ctx.globalAlpha = Math.max(0, Math.min(1, mt.life/40));
+        ctx.strokeStyle = '#bcd4ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(mt.x, mt.y);
+        ctx.lineTo(mt.x - mt.vx*2.2, mt.y - mt.vy*2.2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    if (state === 'play' || state === 'over'){
+      // dan nguoi choi
+      ctx.fillStyle = '#ffe76a';
+      for (var i=0;i<bullets.length;i++){
+        var b = bullets[i];
+        ctx.fillRect(b.x-b.w/2, b.y, b.w, b.h);
+      }
+      // dan dich
+      ctx.fillStyle = '#ff5a5a';
+      for (var i=0;i<eBullets.length;i++){
+        var eb = eBullets[i];
+        ctx.fillRect(eb.x-eb.w/2, eb.y, eb.w, eb.h);
+      }
+      // vat pham
+      for (var i=0;i<powerups.length;i++){ drawPower(powerups[i]); }
+      // dich
+      for (var i=0;i<enemies.length;i++){ drawEnemy(enemies[i]); }
+      // trum cuoi
+      if (boss) drawBoss(boss);
+      // hat no
+      for (var i=0;i<particles.length;i++){
+        var p = particles[i];
+        ctx.globalAlpha = Math.max(0, p.life/34);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x-2, p.y-2, 4, 4);
+      }
+      ctx.globalAlpha = 1;
+      // phi thuyen (nhap nhay khi bat tu)
+      if (state === 'play'){
+        if (!(player.inv > 0 && (player.inv>>2)%2===0)){
+          drawShip(player.x, player.y);
+        }
+        // khien bao ve
+        if (player.shieldT > 0){
+          ctx.globalAlpha = 0.35 + 0.25*Math.sin(Date.now()/120);
+          ctx.strokeStyle = '#7cff6b';
+          ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(player.x, player.y, 26, 0, 6.28); ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function loop(){
+    update();
+    draw();
+    raf(loop);
+  }
+
+  // ===== NUT =====
+  function startGame(){
+    initAudio();
+    startMusic();
+    sndStart();
+    resetGame();
+    state = 'play';
+    startScreen.className = 'overlay';
+    overScreen.className = 'overlay';
+  }
+  document.getElementById('btnStart').onclick = startGame;
+  document.getElementById('btnRestart').onclick = startGame;
+
+  resetGame();
+  state = 'menu';
+  bestScore.innerHTML = best;
+  renderBoard(lbStart, null);
+
+  // ===== CO GIAN KHUNG GAME CHO VUA MAN HINH =====
+  var stage = document.getElementById('stage');
+  function fitScreen(){
+    var h1 = document.getElementById('wrap').getElementsByTagName('h1')[0];
+    var tips = document.getElementById('tips');
+    var usedH = (h1 ? h1.offsetHeight : 0) + (tips ? tips.offsetHeight : 0) + 50;
+    var availH = window.innerHeight - usedH;
+    var availW = window.innerWidth - 24;
+    var ratio = W / H; // 0.8
+    var dh = availH;
+    var dw = dh * ratio;
+    if (dw > availW){ dw = availW; dh = dw / ratio; }
+    if (dh < 300){ dh = 300; dw = dh * ratio; }
+    stage.style.width = Math.round(dw) + 'px';
+    stage.style.height = Math.round(dh) + 'px';
+  }
+  window.onresize = fitScreen;
+  fitScreen();
+
+  // ===== TOÀN MÀN HÌNH (Fullscreen API, co ho tro trinh duyet cu) =====
+  var wrap = document.getElementById('wrap');
+  function isFs(){
+    return document.fullscreenElement || document.webkitFullscreenElement ||
+           document.mozFullScreenElement || document.msFullscreenElement;
+  }
+  function enterFs(el){
+    var fn = el.requestFullscreen || el.webkitRequestFullscreen ||
+             el.webkitRequestFullScreen || el.mozRequestFullScreen ||
+             el.msRequestFullscreen;
+    if (fn) { try { fn.call(el); } catch(e){} }
+  }
+  function exitFs(){
+    var fn = document.exitFullscreen || document.webkitExitFullscreen ||
+             document.mozCancelFullScreen || document.msExitFullscreen;
+    if (fn) { try { fn.call(document); } catch(e){} }
+  }
+  var btnFull = document.getElementById('btnFull');
+  btnFull.onclick = function(){
+    if (isFs()) exitFs(); else enterFs(wrap);
+  };
+  function onFsChange(){
+    if (isFs()){
+      wrap.style.background = '#0a0a1a';
+      wrap.style.height = '100%';
+      btnFull.innerHTML = 'Thoát toàn màn hình';
+    } else {
+      wrap.style.height = '';
+      btnFull.innerHTML = 'Toàn màn hình';
+    }
+    setTimeout(fitScreen, 60);
+  }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  document.addEventListener('mozfullscreenchange', onFsChange);
+  document.addEventListener('MSFullscreenChange', onFsChange);
+
+  loop();
+})();
+</script>
+</body>
+</html>
